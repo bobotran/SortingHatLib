@@ -3,23 +3,18 @@ import pandas as pd
 import numpy as np
 import os
 from pandas.api.types import is_numeric_dtype
-from collections import Counter,defaultdict
-from sklearn.feature_extraction import DictVectorizer
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn import metrics
 import re
 from nltk.corpus import stopwords 
 from nltk.tokenize import word_tokenize 
-import numpy as np
-from autogluon import TabularPrediction as task
-import copy
-import tensorflow_data_validation as tfdv
-# print(tfdv.version.__version__)
-from tensorflow_data_validation.utils.schema_util import get_feature,get_categorical_features,get_categorical_numeric_features,is_categorical_feature,get_multivalent_features
 import joblib
+import bz2
 
-rf_Filename = "resources/RandForest.pkl"
-with open(rf_Filename, 'rb') as file:  Pickled_LR_Model = pickle.load(file)
+RESOURCES_DIR = os.path.join(os.path.dirname(__file__), 'resources')
+
+rf_Filename = os.path.join(RESOURCES_DIR, "compressed_rf.pbz2")
+
+with bz2.BZ2File(rf_Filename, 'rb') as f:
+    Pickled_LR_Model = pickle.load(f)
 
 del_pattern = r'([^,;\|]+[,;\|]{1}[^,;\|]+){1,}'
 del_reg = re.compile(del_pattern)
@@ -35,7 +30,17 @@ email_reg = re.compile(email_pat)
 
 stop_words = set(stopwords.words('english'))
 
-
+class_map = {
+        0: 'numeric',
+        1: 'categorical',
+        2: 'datetime',
+        3: 'sentence',
+        4: 'url',
+        5: 'embedded-number',
+        6: 'list',
+        7: 'not-generalizable',
+        8: 'context-specific'
+    }
 
 def summary_stats(dat, key_s):
     b_data = []
@@ -57,66 +62,20 @@ def summary_stats(dat, key_s):
                 #var = 0
                 min_val = 0
                 max_val = 0           
-            else:    
-                std_dev = np.std(dat[col])
-                var = np.var(dat[col])
-                min_val = float(np.min(dat[col]))
-                max_val = float(np.max(dat[col]))
+            else:
+                data_col = dat[col]
+                if pd.api.types.is_sparse(data_col):
+                    data_col = data_col.sparse.to_dense()
+                std_dev = np.std(data_col)
+                var = np.var(data_col)
+                min_val = float(np.min(data_col))
+                max_val = float(np.max(data_col))
         b_data.append([Total_val, nans, dist_val, mean, std_dev, min_val, max_val])
     return b_data
 
-def castability_feature(dat, column_names):
-    castability_list = []
-    #make sure the value you are avaluating is not nan
-    for keys in column_names:
-        #print(keys)
-        i = 0
-        while pd.isnull(dat[keys][i]):
-            i += 1
-            if i > len(dat[keys]) - 2:
-                break
-        #if type is string try casting
-        if dat[keys][i].__class__.__name__ == 'str':
-            try:
-                castability = str(type(eval(dat[keys][i])))
-                castability_list.append(1)
-            except:
-                castability_list.append(0)
-        else:
-            castability_list.append(0)
-    return castability_list  
-
-
-def numeric_extraction(dat,column_names):
-    #0 no , 1 yes
-    numeric_extraction_list = []
-    #make sure the value you are avaluating is not nan
-    for keys in column_names:
-        i = 0
-        while pd.isnull(dat[keys][i]):
-            i += 1
-            if i > len(dat[keys]) - 2:
-                break
-        val = 0
-            
-        if dat[keys][i].__class__.__name__ == 'str':
-            #print('yes')
-            #check whether any number can be extracted
-            try:
-                #it will faile when you have no numbers or if you have two numbers seperated by space
-                float(re.sub('[^0-9\. ]', ' ',dat[keys][i]))
-                #print('yes')
-                val = 1
-            except:
-                pass
-            
-        numeric_extraction_list.append(val)
-    
-    return numeric_extraction_list
-
 def get_sample(dat, key_s):
     rand = []
-    for name in key_s: # TODO Omg this is bad. Should use key_s.
+    for name in key_s:
         rand_sample = list(pd.unique(dat[name]))
         rand_sample = rand_sample[:5]
         while len(rand_sample) < 5:
@@ -124,15 +83,6 @@ def get_sample(dat, key_s):
         rand.append(rand_sample[:5])
     return rand
 
-def get_avg_tokens(samples):
-    
-    # samples contain list of length len(keys) of 5-sample list.
-    avg_tokens = []
-    for sample_list in samples:
-        list_of_num_tokens = [len(str(sample).split()) for sample in sample_list]
-        avg_tokens.append(sum(list_of_num_tokens) / len(list_of_num_tokens))
-        
-    return avg_tokens
 
 # summary_stat_result has a structure like [[Total_val, nans, dist_va, ...], ...].
 def get_ratio_dist_val(summary_stat_result):
@@ -147,144 +97,117 @@ def get_ratio_nans(summary_stat_result):
         ratio_nans.append(r[1]*100.0 / r[0])
     return ratio_nans
 
-
-
-
-# y = df['out/in']
-
 def FeaturizeFile(df):
-	# df = pd.read_csv(CSVfile,encoding = 'latin1')
+    stats = []
+    attribute_name = []
+    sample = []
+    id_value = []
+    i = 0
 
-	stats = []
-	attribute_name = []
-	sample = []
-	id_value = []
-	i = 0
+    castability = []
+    number_extraction = []
 
-	castability = []
-	number_extraction = []
+    avg_tokens = []
+    ratio_dist_val = []
+    ratio_nans = []
 
-	avg_tokens = []
-	ratio_dist_val = []
-	ratio_nans = []
+    keys = list(df.keys())
+    attribute_name.extend(keys)
+    summary_stat_result = summary_stats(df, keys)
+    stats.extend(summary_stat_result)
+    samples = get_sample(df,keys)
+    sample.extend(samples)
 
-	keys = list(df.keys())
-
-	attribute_name.extend(keys)
-	summary_stat_result = summary_stats(df, keys)
-	stats.extend(summary_stat_result)
-	samples = get_sample(df,keys)
-	sample.extend(samples)
-
-
-	# castability.extend(castability_feature(df, keys))
-	# number_extraction.extend(numeric_extraction(df, keys))
-
-	# avg_tokens.extend(get_avg_tokens(samples))
-	ratio_dist_val.extend(get_ratio_dist_val(summary_stat_result))
-	ratio_nans.extend(get_ratio_nans(summary_stat_result))
+    ratio_dist_val.extend(get_ratio_dist_val(summary_stat_result))
+    ratio_nans.extend(get_ratio_nans(summary_stat_result))
 
 
-	csv_names = ['Attribute_name', 'total_vals', 'num_nans', 'num_of_dist_val', 'mean', 'std_dev', 'min_val',
-	             'max_val', '%_dist_val', '%_nans', 'sample_1', 'sample_2', 'sample_3','sample_4','sample_5'
-	            ]
-	golden_data = pd.DataFrame(columns = csv_names)
+    csv_names = ['Attribute_name', 'total_vals', 'num_nans', 'num_of_dist_val', 'mean', 'std_dev', 'min_val',
+                 'max_val', '%_dist_val', '%_nans', 'sample_1', 'sample_2', 'sample_3','sample_4','sample_5'
+                ]
+    golden_data = pd.DataFrame(columns = csv_names)
+    
+    for i in range(len(attribute_name)):
+        val_append = []
+        val_append.append(attribute_name[i])
+        val_append.extend(stats[i])
+        
+        val_append.append(ratio_dist_val[i])
+        val_append.append(ratio_nans[i])    
+        
+        val_append.extend(sample[i])
 
-	for i in range(len(attribute_name)):
-	    # print(attribute_name[i])
-	    val_append = []
-	    val_append.append(attribute_name[i])
-	    val_append.extend(stats[i])
-	    
-	    val_append.append(ratio_dist_val[i])
-	    val_append.append(ratio_nans[i])    
-	    
-	    val_append.extend(sample[i])
-	#     val_append.append(castability[i])
-	#     val_append.append(number_extraction[i])
-	#     val_append.append(avg_tokens[i])
+        golden_data.loc[i] = val_append
 
-	    golden_data.loc[i] = val_append
-	#     print(golden_data)
+    curdf = golden_data
+    
+    for row in curdf.itertuples():
+        is_list = False
+        curlst = [row[11],row[12],row[13],row[14],row[15]]
+        
+        delim_cnt,url_cnt,email_cnt,date_cnt =0,0,0,0
+        chars_totals,word_totals,stopwords,whitespaces,delims_count = [],[],[],[],[]
+        
+        for value in curlst: # sample values
+            word_totals.append(len(str(value).split(' ')))
+            chars_totals.append(len(str(value)))
+            whitespaces.append(str(value).count(' '))
+            
+            if del_reg.match(str(value)):  delim_cnt += 1    
+            if url_reg.match(str(value)):  url_cnt += 1
+            if email_reg.match(str(value)):  email_cnt += 1
+            
+            delims_count.append(len(delimeters.findall(str(value))))        
+            
+            tokenized = word_tokenize(str(value))
+            stopwords.append(len([w for w in tokenized if w in stop_words]))    
+        
+            try:
+                _ = pd.Timestamp(value)
+                date_cnt += 1
+            # except ValueError: date_cnt += 0
+            except: 
+                date_cnt += 0    
+        
+        if delim_cnt > 2:  curdf.at[row.Index, 'has_delimiters'] = True
+        else: curdf.at[row.Index, 'has_delimiters'] = False
 
+        if url_cnt > 2:  curdf.at[row.Index, 'has_url'] = True
+        else: curdf.at[row.Index, 'has_url'] = False
+            
+        if email_cnt > 2:  curdf.at[row.Index, 'has_email'] = True
+        else: curdf.at[row.Index, 'has_email'] = False   
+            
+        if date_cnt > 2:  curdf.at[row.Index, 'has_date'] = True
+        else: curdf.at[row.Index, 'has_date'] = False           
+            
+        curdf.at[row.Index, 'mean_word_count'] = np.mean(word_totals)
+        curdf.at[row.Index, 'std_dev_word_count'] = np.std(word_totals)
+        
+        curdf.at[row.Index, 'mean_stopword_total'] = np.mean(stopwords)
+        curdf.at[row.Index, 'stdev_stopword_total'] = np.std(stopwords)
+        
+        curdf.at[row.Index, 'mean_char_count'] = np.mean(chars_totals)    
+        curdf.at[row.Index, 'stdev_char_count'] = np.std(chars_totals)
+        
+        curdf.at[row.Index, 'mean_whitespace_count'] = np.mean(whitespaces)
+        curdf.at[row.Index, 'stdev_whitespace_count'] = np.std(whitespaces)    
+        
+        curdf.at[row.Index, 'mean_delim_count'] = np.mean(whitespaces)
+        curdf.at[row.Index, 'stdev_delim_count'] = np.std(whitespaces)      
+        
+        if curdf.at[row.Index, 'has_delimiters'] and curdf.at[row.Index, 'mean_char_count'] < 100: curdf.at[row.Index, 'is_list'] = True    
+        else: curdf.at[row.Index, 'is_list'] = False
+        
+        if curdf.at[row.Index, 'mean_word_count'] > 10: curdf.at[row.Index, 'is_long_sentence'] = True    
+        else: curdf.at[row.Index, 'is_long_sentence'] = False    
 
-	curdf = golden_data
+    golden_data = curdf
 
-	for row in curdf.itertuples():
+    return golden_data	
 
-	    # print(row[11])
-	    is_list = False
-	    curlst = [row[11],row[12],row[13],row[14],row[15]]
-	    
-	    delim_cnt,url_cnt,email_cnt,date_cnt =0,0,0,0
-	    chars_totals,word_totals,stopwords,whitespaces,delims_count = [],[],[],[],[]
-	    
-	    for value in curlst: 
-	        word_totals.append(len(str(value).split(' ')))
-	        chars_totals.append(len(str(value)))
-	        whitespaces.append(str(value).count(' '))
-	        
-	        if del_reg.match(str(value)):  delim_cnt += 1    
-	        if url_reg.match(str(value)):  url_cnt += 1
-	        if email_reg.match(str(value)):  email_cnt += 1
-	        
-	        delims_count.append(len(delimeters.findall(str(value))))        
-	    
-	        tokenized = word_tokenize(str(value))
-	        # print(tokenized)
-	        stopwords.append(len([w for w in tokenized if w in stop_words]))    
-	    
-	        try:
-	            _ = pd.Timestamp(value)
-	            date_cnt += 1
-	        except ValueError: date_cnt += 0    
-	    
-	    # print(delim_cnt,url_cnt,email_cnt)
-	    if delim_cnt > 2:  curdf.at[row.Index, 'has_delimiters'] = True
-	    else: curdf.at[row.Index, 'has_delimiters'] = False
-
-	    if url_cnt > 2:  curdf.at[row.Index, 'has_url'] = True
-	    else: curdf.at[row.Index, 'has_url'] = False
-	        
-	    if email_cnt > 2:  curdf.at[row.Index, 'has_email'] = True
-	    else: curdf.at[row.Index, 'has_email'] = False   
-	        
-	    if date_cnt > 2:  curdf.at[row.Index, 'has_date'] = True
-	    else: curdf.at[row.Index, 'has_date'] = False           
-	        
-	    curdf.at[row.Index, 'mean_word_count'] = np.mean(word_totals)
-	    curdf.at[row.Index, 'std_dev_word_count'] = np.std(word_totals)
-	    
-	    curdf.at[row.Index, 'mean_stopword_total'] = np.mean(stopwords)
-	    curdf.at[row.Index, 'stdev_stopword_total'] = np.std(stopwords)
-	    
-	    curdf.at[row.Index, 'mean_char_count'] = np.mean(chars_totals)    
-	    curdf.at[row.Index, 'stdev_char_count'] = np.std(chars_totals)
-	    
-	    curdf.at[row.Index, 'mean_whitespace_count'] = np.mean(whitespaces)
-	    curdf.at[row.Index, 'stdev_whitespace_count'] = np.std(whitespaces)    
-	    
-	    curdf.at[row.Index, 'mean_delim_count'] = np.mean(whitespaces)
-	    curdf.at[row.Index, 'stdev_delim_count'] = np.std(whitespaces)      
-	    
-	    if curdf.at[row.Index, 'has_delimiters'] and curdf.at[row.Index, 'mean_char_count'] < 100: curdf.at[row.Index, 'is_list'] = True    
-	    else: curdf.at[row.Index, 'is_list'] = False
-	    
-	    if curdf.at[row.Index, 'mean_word_count'] > 10: curdf.at[row.Index, 'is_long_sentence'] = True    
-	    else: curdf.at[row.Index, 'is_long_sentence'] = False    
-	    
-	    # print(np.mean(stopwords))
-	    
-	    # print('\n\n\n')
-
-	golden_data = curdf
-
-	return golden_data	
-
-
-# vectorizer,vectorizer1,vectorizer2 = CountVectorizer(decode_error="replace",vocabulary=pickle.load(open("vectorizer.pkl", "rb"))),CountVectorizer(decode_error="replace",vocabulary=pickle.load(open("vectorizer1.pkl", "rb"))),CountVectorizer(decode_error="replace",vocabulary=pickle.load(open("vectorizer2.pkl", "rb")))
-vectorizerName = joblib.load("resources/dictionaryName.pkl")
-vectorizerSample = joblib.load("resources/dictionarySample.pkl")
+vectorizerName = joblib.load(os.path.join(RESOURCES_DIR, "dictionaryName.pkl"))
+vectorizerSample = joblib.load(os.path.join(RESOURCES_DIR, "dictionarySample.pkl"))
 
 def FeatureExtraction(data):
 
@@ -292,7 +215,7 @@ def FeatureExtraction(data):
        'std_dev_word_count', 'mean_stopword_total', 'stdev_stopword_total',
        'mean_char_count', 'stdev_char_count', 'mean_whitespace_count',
        'stdev_whitespace_count', 'mean_delim_count', 'stdev_delim_count',
-       'is_list', 'is_long_sentence']]
+       'is_list', 'is_long_sentence']] # drops Attribute_name and sample values
     data1 = data1.reset_index(drop=True)
     data1 = data1.fillna(0)
 
@@ -300,12 +223,11 @@ def FeatureExtraction(data):
     arr = [str(x) for x in arr]
     
     arr1 = data['sample_1'].values
-    arr1 = [str(x) for x in arr1]
+    arr1 = [str(x) for x in arr1] # One row of values
     arr2 = data['sample_2'].values
     arr2 = [str(x) for x in arr2]
     arr3 = data['sample_3'].values
     arr3 = [str(x) for x in arr3]    
-    print(len(arr1),len(arr2))
 
     X = vectorizerName.transform(arr)
     X1 = vectorizerSample.transform(arr1)
@@ -314,13 +236,79 @@ def FeatureExtraction(data):
     attr_df = pd.DataFrame(X.toarray())
     sample1_df = pd.DataFrame(X1.toarray())
     sample2_df = pd.DataFrame(X2.toarray())
-    print(len(data1),len(attr_df),len(sample1_df),len(sample2_df))
     
     data2 = pd.concat([data1, attr_df], axis=1, sort=False)
-    print(len(data2))
     return data2
 
 
 def Load_RF(df):
-	y_RF = Pickled_LR_Model.predict(df).tolist()
-	return y_RF
+    y_RF = Pickled_LR_Model.predict(df).tolist()
+    return y_RF
+
+def get_sortinghat_types(df):
+    dataFeaturized = FeaturizeFile(df)
+    dataFeaturized1 = FeatureExtraction(dataFeaturized)
+    y_RF = Load_RF(dataFeaturized1) # Prediction
+    return [class_map[y] for y in y_RF]
+
+def get_expanded_feature_types(df):
+    sortinghat_types = get_sortinghat_types(df)
+
+    expanded_types = []
+    for i in range(len(sortinghat_types)):
+        sortinghat_type = sortinghat_types[i]
+
+        if sortinghat_type == 'numeric':
+            if pd.api.types.is_integer_dtype(df.iloc[:,i]):
+                column_dtype = 'integer'
+            else:
+                column_dtype = 'floating'
+        elif sortinghat_type == 'categorical':
+            if pd.api.types.is_bool_dtype(df.iloc[:,i]):
+                column_dtype = 'boolean'
+        else:
+            column_dtype = sortinghat_type
+
+        expanded_types.append(column_dtype)
+    return expanded_types
+
+
+def get_feature_types_as_arff(df):
+    PD_DTYPES_TO_ARFF_DTYPE = {"integer": "INTEGER", "floating": "REAL", "string": "STRING", "ignore": "IGNORE"}
+    
+    sortinghat_types = get_sortinghat_types(df)
+
+    attributes_arff = []
+    for i in range(len(sortinghat_types)):
+        sortinghat_type = sortinghat_types[i]
+        # Map Sortinghat feature types to arff
+        if sortinghat_type == 'numeric':
+            if pd.api.types.is_integer_dtype(df.iloc[:,i]):
+                column_dtype = 'integer'
+            else:
+                column_dtype = 'floating'
+        elif sortinghat_type in ('datetime', 'sentence', 'url', 'embedded-number', 'list', 'context-specific'):
+            column_dtype = 'string'
+        elif sortinghat_type == 'not-generalizable':
+            column_dtype = 'ignore'
+        else:
+            # Categorical
+            column_dtype = sortinghat_type
+
+        # Output in arff format
+        column_name = str(df.iloc[:,i].name)
+        if column_dtype == "categorical":
+            # for categorical feature, arff expects a list string. However, a
+            # categorical column can contain mixed type and should therefore
+            # raise an error asking to convert all entries to string.
+            categories = df.iloc[:,i].astype('category').cat.categories
+            categories_dtype = pd.api.types.infer_dtype(categories)
+            attributes_arff.append((column_name, categories.tolist()))
+        elif column_dtype in PD_DTYPES_TO_ARFF_DTYPE.keys():
+            attributes_arff.append((column_name, PD_DTYPES_TO_ARFF_DTYPE[column_dtype]))
+        else:
+            raise ValueError(
+                "The column {} is of an unexpected type.".format(column_name)
+            )
+
+    return attributes_arff, sortinghat_types
