@@ -298,9 +298,6 @@ def get_feature_types_as_arff(df):
         # Output in arff format
         column_name = str(df.iloc[:,i].name)
         if column_dtype == "categorical":
-            # for categorical feature, arff expects a list string. However, a
-            # categorical column can contain mixed type and should therefore
-            # raise an error asking to convert all entries to string.
             categories = df.iloc[:,i].astype('category').cat.categories
             categories_dtype = pd.api.types.infer_dtype(categories)
             attributes_arff.append((column_name, categories.tolist()))
