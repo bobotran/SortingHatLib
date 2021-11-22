@@ -95,6 +95,16 @@ def get_ratio_nans(summary_stat_result):
         ratio_nans.append(r[1]*100.0 / r[0])
     return ratio_nans
 
+def FeaturizeAndExtract(df):
+    """
+    Takes a dataframe and runs base featurization on it.
+    Then runs feature extraction on the featurized data.
+    Returns the featurized data.
+    """
+    dataFeaturized = FeaturizeFile(df)
+    dataFeaturized1 = FeatureExtraction(dataFeaturized)
+    return dataFeaturized1
+
 def FeaturizeFile(df):
     stats = []
     attribute_name = []
@@ -207,8 +217,7 @@ def FeaturizeFile(df):
 vectorizerName = joblib.load(os.path.join(RESOURCES_DIR, "dictionaryName.pkl"))
 vectorizerSample = joblib.load(os.path.join(RESOURCES_DIR, "dictionarySample.pkl"))
 
-def FeatureExtraction(data):
-
+def ProcessStats(data):
     data1 = data[['total_vals', 'num_nans', '%_nans', 'num_of_dist_val', '%_dist_val', 'mean', 'std_dev', 'min_val', 'max_val','has_delimiters', 'has_url', 'has_email', 'has_date', 'mean_word_count',
        'std_dev_word_count', 'mean_stopword_total', 'stdev_stopword_total',
        'mean_char_count', 'stdev_char_count', 'mean_whitespace_count',
@@ -216,6 +225,10 @@ def FeatureExtraction(data):
        'is_list', 'is_long_sentence']] # drops Attribute_name and sample values
     data1 = data1.reset_index(drop=True)
     data1 = data1.fillna(0)
+    return data1
+
+def FeatureExtraction(data):
+    data1 = ProcessStats(data)
 
     arr = data['Attribute_name'].values
     arr = [str(x) for x in arr]
@@ -240,13 +253,15 @@ def FeatureExtraction(data):
 
 
 def Load_RF(df):
+    """
+    Runs the Random Forest Classifier on the given data.
+    """
     y_RF = Pickled_LR_Model.predict(df).tolist()
     return y_RF
 
 def get_sortinghat_types(df):
-    dataFeaturized = FeaturizeFile(df)
-    dataFeaturized1 = FeatureExtraction(dataFeaturized)
-    y_RF = Load_RF(dataFeaturized1) # Prediction
+    dataFeaturized = FeaturizeAndExtract(df)
+    y_RF = Load_RF(dataFeaturized) # Prediction
     return [class_map[y] for y in y_RF]
 
 def get_expanded_feature_types(df):
