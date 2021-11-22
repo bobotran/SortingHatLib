@@ -32,7 +32,7 @@ Same as SortingHat except:
 Here, we run feature type inference on a dataset obtained from OpenML.
 Note: this can be done with any dataset loaded as a Pandas dataframe, but we use OpenML here as an example.
 1. Install the package using python-pip.
-```bash
+```
 git clone https://github.com/pvn25/SortingHatLib.git
 pip install SortingHatLib/
 ```
@@ -67,7 +67,8 @@ infer_sh = pl.get_sortinghat_types(X)
 infer_ext = pl.get_expanded_feature_types(X)
 
 # Infer the ARFF feature types.
-infer_arff = pl.get_feature_types_as_arff(X)
+# The `get_feature_types_as_arff()` also returns the SortingHat feature types.
+infer_arff, infer_sh = pl.get_feature_types_as_arff(X)
 ```
 
 
