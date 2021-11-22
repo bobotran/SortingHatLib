@@ -1,4 +1,3 @@
-import pickle
 import pandas as pd
 import numpy as np
 import os
@@ -7,14 +6,13 @@ import re
 from nltk.corpus import stopwords 
 from nltk.tokenize import word_tokenize 
 import joblib
-import bz2
+import model_loading
 
 RESOURCES_DIR = os.path.join(os.path.dirname(__file__), 'resources')
 
 rf_Filename = os.path.join(RESOURCES_DIR, "compressed_rf.pbz2")
 
-with bz2.BZ2File(rf_Filename, 'rb') as f:
-    Pickled_LR_Model = pickle.load(f)
+Pickled_LR_Model = model_loading.decompress_pickle(filename=rf_Filename)
 
 del_pattern = r'([^,;\|]+[,;\|]{1}[^,;\|]+){1,}'
 del_reg = re.compile(del_pattern)
