@@ -15,6 +15,6 @@ setup(
     package_data={"": ["resources/*"]},
     install_requires=['pandas','numpy', 'nltk', 'joblib', 'scikit-learn==0.22.2.post1'],
     python_requires=">=3.6",
-    version='0.0.1',
+    version='0.0.3',
     license='MIT',
 )

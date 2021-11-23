@@ -6,27 +6,27 @@ Library for ML feature type inference: https://github.com/pvn25/ML-Data-Prep-Zoo
 
 ## Feature Types
 ### SortingHat
-- `Numeric`
-- `Categorical`
-- `Datetime`
-- `Sentence`
-- `URL`
-- `Embedded Number`
-- `List`
-- `Not-Generalizable`
-- `Context-Specific`
+- `numeric`
+- `categorical`
+- `datetime`
+- `sentence`
+- `url`
+- `embedded-number`
+- `list`
+- `not-generalizable`
+- `context-specific`
 
 ### Extended
 Same as SortingHat except:
-- `Numeric` mapped to `Integer` or `Floating`
-- `Categorical` mapped to `Boolean` if Boolean
+- `numeric` mapped to `integer` or `floating`
+- `categorical` mapped to `boolean` if Boolean
 
 ### ARFF
-- `Integer`
-- `Real` (Float)
 - `Nominal-specification` (Categorical)
-- `String`
-- `Ignore` (Not-Generalizable)
+- `INTEGER`
+- `REAL` (Float)
+- `STRING`
+- `IGNORE` (Not-Generalizable)
 
 ## Example Usage with OpenML
 Here, we run feature type inference on a dataset obtained from OpenML.
