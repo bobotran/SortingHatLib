@@ -6,13 +6,13 @@ import re
 from nltk.corpus import stopwords 
 from nltk.tokenize import word_tokenize 
 import joblib
-import model_loading
+from .model_loading import decompress_pickle
 
 RESOURCES_DIR = os.path.join(os.path.dirname(__file__), 'resources')
 
 rf_Filename = os.path.join(RESOURCES_DIR, "compressed_rf.pbz2")
 
-Pickled_LR_Model = model_loading.decompress_pickle(filename=rf_Filename)
+Pickled_LR_Model = decompress_pickle(filename=rf_Filename)
 
 del_pattern = r'([^,;\|]+[,;\|]{1}[^,;\|]+){1,}'
 del_reg = re.compile(del_pattern)
@@ -95,17 +95,17 @@ def get_ratio_nans(summary_stat_result):
         ratio_nans.append(r[1]*100.0 / r[0])
     return ratio_nans
 
-def FeaturizeAndExtract(df):
+def featurize_and_extract(df):
     """
     Takes a dataframe and runs base featurization on it.
     Then runs feature extraction on the featurized data.
     Returns the featurized data.
     """
-    dataFeaturized = FeaturizeFile(df)
-    dataFeaturized1 = FeatureExtraction(dataFeaturized)
+    dataFeaturized = featurize_file(df)
+    dataFeaturized1 = feature_extraction(dataFeaturized)
     return dataFeaturized1
 
-def FeaturizeFile(df):
+def featurize_file(df):
     stats = []
     attribute_name = []
     sample = []
@@ -217,7 +217,7 @@ def FeaturizeFile(df):
 vectorizerName = joblib.load(os.path.join(RESOURCES_DIR, "dictionaryName.pkl"))
 vectorizerSample = joblib.load(os.path.join(RESOURCES_DIR, "dictionarySample.pkl"))
 
-def ProcessStats(data):
+def process_stats(data):
     data1 = data[['total_vals', 'num_nans', '%_nans', 'num_of_dist_val', '%_dist_val', 'mean', 'std_dev', 'min_val', 'max_val','has_delimiters', 'has_url', 'has_email', 'has_date', 'mean_word_count',
        'std_dev_word_count', 'mean_stopword_total', 'stdev_stopword_total',
        'mean_char_count', 'stdev_char_count', 'mean_whitespace_count',
@@ -227,8 +227,8 @@ def ProcessStats(data):
     data1 = data1.fillna(0)
     return data1
 
-def FeatureExtraction(data):
-    data1 = ProcessStats(data)
+def feature_extraction(data):
+    data1 = process_stats(data)
 
     arr = data['Attribute_name'].values
     arr = [str(x) for x in arr]
@@ -252,7 +252,7 @@ def FeatureExtraction(data):
     return data2
 
 
-def Load_RF(df):
+def load_RF(df):
     """
     Runs the Random Forest Classifier on the given data.
     """
@@ -260,8 +260,8 @@ def Load_RF(df):
     return y_RF
 
 def get_sortinghat_types(df):
-    dataFeaturized = FeaturizeAndExtract(df)
-    y_RF = Load_RF(dataFeaturized) # Prediction
+    dataFeaturized = featurize_and_extract(df)
+    y_RF = load_RF(dataFeaturized) # Prediction
     return [class_map[y] for y in y_RF]
 
 def get_expanded_feature_types(df):
@@ -271,17 +271,16 @@ def get_expanded_feature_types(df):
     for i in range(len(sortinghat_types)):
         sortinghat_type = sortinghat_types[i]
 
+        column_dtype = sortinghat_type
         if sortinghat_type == 'numeric':
             if pd.api.types.is_integer_dtype(df.iloc[:,i]):
                 column_dtype = 'integer'
             else:
                 column_dtype = 'floating'
-        elif sortinghat_type == 'categorical':
+        if sortinghat_type == 'categorical':
             if pd.api.types.is_bool_dtype(df.iloc[:,i]):
                 column_dtype = 'boolean'
-        else:
-            column_dtype = sortinghat_type
-
+        
         expanded_types.append(column_dtype)
     return expanded_types
 
@@ -295,6 +294,7 @@ def get_feature_types_as_arff(df):
     for i in range(len(sortinghat_types)):
         sortinghat_type = sortinghat_types[i]
         # Map Sortinghat feature types to arff
+        column_dtype = sortinghat_type
         if sortinghat_type == 'numeric':
             if pd.api.types.is_integer_dtype(df.iloc[:,i]):
                 column_dtype = 'integer'
@@ -304,9 +304,6 @@ def get_feature_types_as_arff(df):
             column_dtype = 'string'
         elif sortinghat_type == 'not-generalizable':
             column_dtype = 'ignore'
-        else:
-            # Categorical
-            column_dtype = sortinghat_type
 
         # Output in arff format
         column_name = str(df.iloc[:,i].name)

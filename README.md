@@ -1,6 +1,6 @@
-# SortingHatLib
+# SortingHatInf
 
-SortingHatLib is a library that implements ML-based feature type inference as seen in the paper [here](https://adalabucsd.github.io/papers/2021_SortingHat_SIGMOD.pdf). Feature type inference is the task of predicting the feature types of the columns of a given dataset.
+SortingHatInf is a library that implements ML-based feature type inference as seen in the paper [here](https://adalabucsd.github.io/papers/2021_SortingHat_SIGMOD.pdf). Feature type inference is the task of predicting the feature types of the columns of a given dataset.
 
 Library for ML feature type inference: https://github.com/pvn25/ML-Data-Prep-Zoo/tree/master/MLFeatureTypeInference.
 
@@ -26,49 +26,53 @@ Same as SortingHat except:
 - `Real` (Float)
 - `Nominal-specification` (Categorical)
 - `String`
-- `Ignore`
+- `Ignore` (Not-Generalizable)
 
 ## Example Usage with OpenML
 Here, we run feature type inference on a dataset obtained from OpenML.
 Note: this can be done with any dataset loaded as a Pandas dataframe, but we use OpenML here as an example.
-1. Install the package using python-pip.
+
+1. First ensure `pip`, `wheel`, and `setuptools` are up-to-date.
 ```
-git clone https://github.com/pvn25/SortingHatLib.git
-pip install SortingHatLib/
+python -m pip install --upgrade pip setuptools wheel
+``` 
+2. Install the package using python-pip.
 ```
-2. Import the library.
+pip install sortinghatinf
 ```
-import sortinghat.pylib as pl
+3. Import the library.
+```
+import sortinghatinf
 ```
 
-3. Install the OpenML python API.
+4. Install the OpenML python API.
 ```
 pip install openml
 ```
 
-4. Import the OpenML python library.
+5. Import the OpenML python library.
 ```
 import openml
 ```
 
-5. Load the 'Blood Transfusion Service Center' dataset from OpenML (dataset_id=31).
+6. Load the 'Blood Transfusion Service Center' dataset from OpenML (dataset_id=31).
 Note: This requires an OpenML account which you can setup by following this [link](https://docs.openml.org/Python-start/).
 ```
 data = openml.datasets.get_dataset(dataset_id=31)
-X, y, cat_ind, attr_names = data.get_data()
+X, _, _, _ = data.get_data() # Loaded as Pandas dataframe
 ```
 
-6. Infer the feature types for the data columns.
+7. Infer the feature types for the data columns.
 ```
 # Infer the SortingHat feature types.
-infer_sh = pl.get_sortinghat_types(X)
+infer_sh = sortinghatinf.get_sortinghat_types(X)
 
 # Infer the extended feature types.
-infer_ext = pl.get_expanded_feature_types(X)
+infer_ext = sortinghatinf.get_expanded_feature_types(X)
 
 # Infer the ARFF feature types.
-# The `get_feature_types_as_arff()` also returns the SortingHat feature types.
-infer_arff, infer_sh = pl.get_feature_types_as_arff(X)
+# The function `get_feature_types_as_arff()` also returns the SortingHat feature types.
+infer_arff, infer_sh = sortinghatinf.get_feature_types_as_arff(X)
 ```
 
 

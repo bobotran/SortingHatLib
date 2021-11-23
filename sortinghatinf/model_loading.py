@@ -16,6 +16,6 @@ def compress_pickle(filename, data):
 
 # Loads and decompresses the compressed model.
 def decompress_pickle(filename):
-    data = bz2.BZ2File(filename, 'rb')
-    data = pickle.load(data)
+    with bz2.BZ2File(filename, 'rb') as f:
+        data = pickle.load(f)
     return data
