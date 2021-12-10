@@ -7,6 +7,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize 
 import joblib
 from .model_loading import decompress_pickle
+from typing import List, Tuple, Union
 
 RESOURCES_DIR = os.path.join(os.path.dirname(__file__), 'resources')
 
@@ -39,6 +40,8 @@ class_map = {
         7: 'not-generalizable',
         8: 'context-specific'
     }
+
+### Private Functions ###
 
 def summary_stats(dat, key_s):
     b_data = []
@@ -259,12 +262,22 @@ def load_RF(df):
     y_RF = Pickled_LR_Model.predict(df).tolist()
     return y_RF
 
-def get_sortinghat_types(df):
+### Public Functions ###
+
+def get_sortinghat_types(df: pd.DataFrame) -> List[str]:
+    """
+    Returns a list of the predicted SortingHat feature types on the columns of the specified Pandas dataframe 
+    """
     dataFeaturized = featurize_and_extract(df)
     y_RF = load_RF(dataFeaturized) # Prediction
     return [class_map[y] for y in y_RF]
 
-def get_expanded_feature_types(df):
+def get_expanded_feature_types(df: pd.DataFrame) -> List[str]:
+    """
+    Returns a list of the predicted SortingHat feature types 
+    on the columns of the specified Pandas dataframe 
+    mapped to the expanded types 
+    """
     sortinghat_types = get_sortinghat_types(df)
 
     expanded_types = []
@@ -285,7 +298,11 @@ def get_expanded_feature_types(df):
     return expanded_types
 
 
-def get_feature_types_as_arff(df):
+def get_feature_types_as_arff(df: pd.DataFrame) -> Tuple[List[Tuple[str, Union[int, float, str, List[str]]]], List[str]]:
+    """
+    Returns the predicted SortingHat feature types mapped to the loose ARFF types 
+    and the original predicted SortingHat feature types  
+    """
     PD_DTYPES_TO_ARFF_DTYPE = {"integer": "INTEGER", "floating": "REAL", "string": "STRING", "ignore": "IGNORE"}
     
     sortinghat_types = get_sortinghat_types(df)
