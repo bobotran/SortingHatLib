@@ -2,8 +2,6 @@
 
 SortingHatInf is a library that implements ML-based feature type inference as seen in the paper [here](https://adalabucsd.github.io/papers/2021_SortingHat_SIGMOD.pdf). Feature type inference is the task of predicting the feature types of the columns of a given dataset.
 
-Library for ML feature type inference: https://github.com/pvn25/ML-Data-Prep-Zoo/tree/master/MLFeatureTypeInference.
-
 ## Feature Types
 ### SortingHat
 - `numeric`
@@ -16,17 +14,51 @@ Library for ML feature type inference: https://github.com/pvn25/ML-Data-Prep-Zoo
 - `not-generalizable`
 - `context-specific`
 
-### Extended
+### Expanded
 Same as SortingHat except:
 - `numeric` mapped to `integer` or `floating`
 - `categorical` mapped to `boolean` if Boolean
 
-### ARFF
+### ARFF (loose)
 - `Nominal-specification` (Categorical)
 - `INTEGER`
 - `REAL` (Float)
 - `STRING`
 - `IGNORE` (Not-Generalizable)
+
+## API Documentation
+`get_sortinghat_types(df: pd.DataFrame) -> List[str]` returns a list of the predicted SortingHat feature types on the columns of the specified Pandas dataframe  
+Ex. `infer_sh = sortinghatinf.get_sortinghat_types(df)`  
+<pre><code>> infer_sh  
+> [  
+> &nbsp;  'COL_TYPE_1',  
+> &nbsp;  'COL_TYPE_2',  
+> &nbsp;  ...  
+> ]  
+</code></pre>
+
+`get_expanded_feature_types(df: pd.DataFrame) -> List[str]` returns a list of the predicted SortingHat feature types on the columns of the specified Pandas dataframe mapped to the expanded types  
+Ex. `infer_exp = sortinghatinf.get_expanded_types(df)`  
+<pre><code>> infer_exp  
+> [    
+> &nbsp;  'COL_TYPE_1',  
+> &nbsp;  'COL_TYPE_2',  
+> &nbsp;  ...   
+> ]  
+</code></pre>
+
+`get_feature_types_as_arff(df: pd.DataFrame) -> Tuple[List[Tuple[str, Union[int, float, str, List[str]]]], List[str]]` returns the predicted SortingHat feature types mapped to the loose ARFF types and the original predicted SortingHat feature types  
+Ex. `infer_arff, infer_sh = sortinghatinf.get_expanded_types(df)`  
+<pre><code>> infer_arff  
+> [  
+> &nbsp;  ('COL_NAME_1', ['POSSIBLE_VALUE_1', 'POSSIBLE_VALUE_2', ...]), # NOMINAL  
+> &nbsp;  ('COL_NAME_2', INTEGER), # INTEGER  
+> &nbsp;  ('COL_NAME_3', FLOAT), # REAL  
+> &nbsp;  ('COL_NAME_4', STRING), # STRING  
+> &nbsp;  ('COL_NAME_5', 'IGNORE'), # IGNORE  
+> &nbsp;  ...  
+> ]  
+</code></pre>
 
 ## Example Usage with OpenML
 Here, we run feature type inference on a dataset obtained from OpenML.
@@ -67,8 +99,8 @@ X, _, _, _ = data.get_data() # Loaded as Pandas dataframe
 # Infer the SortingHat feature types.
 infer_sh = sortinghatinf.get_sortinghat_types(X)
 
-# Infer the extended feature types.
-infer_ext = sortinghatinf.get_expanded_feature_types(X)
+# Infer the expanded feature types.
+infer_exp = sortinghatinf.get_expanded_feature_types(X)
 
 # Infer the ARFF feature types.
 # The function `get_feature_types_as_arff()` also returns the SortingHat feature types.
