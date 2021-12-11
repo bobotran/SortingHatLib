@@ -298,13 +298,11 @@ def get_expanded_feature_types(df: pd.DataFrame) -> List[str]:
     return expanded_types
 
 
-def get_feature_types_as_arff(df: pd.DataFrame) -> Tuple[List[Tuple[str, Union[int, float, str, List[str]]]], List[str]]:
+def get_feature_types_as_arff(df: pd.DataFrame) -> Tuple[List[Tuple[str, Union[str, List[str]]]], List[str]]:
     """
     Returns the predicted SortingHat feature types mapped to the loose ARFF types 
     and the original predicted SortingHat feature types  
     """
-    PD_DTYPES_TO_ARFF_DTYPE = {"integer": "INTEGER", "floating": "REAL", "string": "STRING", "ignore": "IGNORE"}
-    
     sortinghat_types = get_sortinghat_types(df)
 
     attributes_arff = []
@@ -318,7 +316,19 @@ def get_feature_types_as_arff(df: pd.DataFrame) -> Tuple[List[Tuple[str, Union[i
             else:
                 attributes_arff.append((column_name, 'REAL'))
         elif sortinghat_type == 'categorical':
+            # for categorical feature, arff expects a list string. However, a
+            # categorical column can contain mixed type and should therefore
+            # raise an error asking to convert all entries to string.
             categories = df.iloc[:,i].astype('category').cat.categories
+            categories_dtype = pd.api.types.infer_dtype(categories)
+            if categories_dtype not in ("string", "unicode"):
+                raise ValueError(
+                    "The column '{}' of the dataframe was detected "
+                    "to be categorical. Therefore, we require all values in "
+                    "this column to be string. Please "
+                    "convert the entries which are not string. "
+                    "Got {} dtype in this column.".format(column_name, categories_dtype)
+                )
             attributes_arff.append((column_name, categories.tolist()))
         elif sortinghat_type in ('datetime', 'sentence', 'url', 'embedded-number', 'list', 'context-specific'):
             attributes_arff.append((column_name, 'STRING'))
