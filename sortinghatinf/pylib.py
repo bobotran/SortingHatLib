@@ -306,6 +306,8 @@ def get_feature_types_as_arff(df: pd.DataFrame) -> Tuple[List[Tuple[str, Union[s
     sortinghat_types = get_sortinghat_types(df)
 
     attributes_arff = []
+    # Collects categorical columns that need to be cast to string
+    non_str_categoricals = []
     for i in range(len(sortinghat_types)):
         sortinghat_type = sortinghat_types[i]
         # Map Sortinghat feature types to arff
@@ -322,13 +324,7 @@ def get_feature_types_as_arff(df: pd.DataFrame) -> Tuple[List[Tuple[str, Union[s
             categories = df.iloc[:,i].astype('category').cat.categories
             categories_dtype = pd.api.types.infer_dtype(categories)
             if categories_dtype not in ("string", "unicode"):
-                raise ValueError(
-                    "The column '{}' of the dataframe was detected "
-                    "to be categorical. Therefore, we require all values in "
-                    "this column to be string. Please "
-                    "convert the entries which are not string. "
-                    "Got {} dtype in this column.".format(column_name, categories_dtype)
-                )
+                non_str_categoricals.append((column_name, categories_dtype))
             attributes_arff.append((column_name, categories.tolist()))
         elif sortinghat_type in ('datetime', 'sentence', 'url', 'embedded-number', 'list', 'context-specific'):
             attributes_arff.append((column_name, 'STRING'))
@@ -336,7 +332,19 @@ def get_feature_types_as_arff(df: pd.DataFrame) -> Tuple[List[Tuple[str, Union[s
             attributes_arff.append((column_name, 'IGNORE'))
         else:
             raise ValueError(
-                "The column {} is of an unexpected type {}.".format(column_name, sortinghat_type)
+                "The column {} is of an unrecognized type {}.".format(column_name, sortinghat_type)
             )
+
+    # Detected categorical columns that need to be cast to string
+    if len(non_str_categoricals) > 0:
+        raise ValueError(
+                    "The column(s) {} of the dataframe were detected "
+                    "to be categorical. Therefore, we require all values in "
+                    "these columns to be string. Please "
+                    "convert the entries which are not string. "
+                    "Detected dtypes {} for these columns respectively.".format(
+                        [c[0] for c in non_str_categoricals], 
+                        [c[1] for c in non_str_categoricals])
+                )
 
     return attributes_arff, sortinghat_types

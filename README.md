@@ -47,18 +47,20 @@ Ex. `infer_exp = sortinghatinf.get_expanded_types(df)`
 > ]  
 </code></pre>
 
-`get_feature_types_as_arff(df: pd.DataFrame) -> Tuple[List[Tuple[str, Union[int, float, str, List[str]]]], List[str]]` returns the predicted SortingHat feature types mapped to the loose ARFF types and the original predicted SortingHat feature types  
+`get_feature_types_as_arff(df: pd.DataFrame) -> Tuple[List[Tuple[str, Union[str, List[str]]]], List[str]]` returns the predicted SortingHat feature types mapped to the loose ARFF types and the original predicted SortingHat feature types  
 Ex. `infer_arff, infer_sh = sortinghatinf.get_expanded_types(df)`  
 <pre><code>> infer_arff  
 > [  
 > &nbsp;  ('COL_NAME_1', ['POSSIBLE_VALUE_1', 'POSSIBLE_VALUE_2', ...]), # NOMINAL  
-> &nbsp;  ('COL_NAME_2', INTEGER), # INTEGER  
-> &nbsp;  ('COL_NAME_3', FLOAT), # REAL  
-> &nbsp;  ('COL_NAME_4', STRING), # STRING  
+> &nbsp;  ('COL_NAME_2', 'INTEGER'), # INTEGER  
+> &nbsp;  ('COL_NAME_3', 'FLOAT'), # REAL  
+> &nbsp;  ('COL_NAME_4', 'STRING'), # STRING  
 > &nbsp;  ('COL_NAME_5', 'IGNORE'), # IGNORE  
 > &nbsp;  ...  
 > ]  
 </code></pre>
+
+**Note**: Because ARFF expects a string list for categorical features, columns discovered to be categorical should be converted to string. This function will report these columns with an error.
 
 ## Example Usage with OpenML
 Here, we run feature type inference on a dataset obtained from OpenML.
