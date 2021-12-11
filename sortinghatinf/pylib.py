@@ -311,28 +311,22 @@ def get_feature_types_as_arff(df: pd.DataFrame) -> Tuple[List[Tuple[str, Union[i
     for i in range(len(sortinghat_types)):
         sortinghat_type = sortinghat_types[i]
         # Map Sortinghat feature types to arff
-        column_dtype = sortinghat_type
+        column_name = str(df.iloc[:,i].name)
         if sortinghat_type == 'numeric':
             if pd.api.types.is_integer_dtype(df.iloc[:,i]):
-                column_dtype = 'integer'
+                attributes_arff.append((column_name, 'INTEGER'))
             else:
-                column_dtype = 'floating'
-        elif sortinghat_type in ('datetime', 'sentence', 'url', 'embedded-number', 'list', 'context-specific'):
-            column_dtype = 'string'
-        elif sortinghat_type == 'not-generalizable':
-            column_dtype = 'ignore'
-
-        # Output in arff format
-        column_name = str(df.iloc[:,i].name)
-        if column_dtype == "categorical":
+                attributes_arff.append((column_name, 'REAL'))
+        elif sortinghat_type == 'categorical':
             categories = df.iloc[:,i].astype('category').cat.categories
-            categories_dtype = pd.api.types.infer_dtype(categories)
             attributes_arff.append((column_name, categories.tolist()))
-        elif column_dtype in PD_DTYPES_TO_ARFF_DTYPE.keys():
-            attributes_arff.append((column_name, PD_DTYPES_TO_ARFF_DTYPE[column_dtype]))
+        elif sortinghat_type in ('datetime', 'sentence', 'url', 'embedded-number', 'list', 'context-specific'):
+            attributes_arff.append((column_name, 'STRING'))
+        elif sortinghat_type == 'not-generalizable':
+            attributes_arff.append((column_name, 'IGNORE'))
         else:
             raise ValueError(
-                "The column {} is of an unexpected type.".format(column_name)
+                "The column {} is of an unexpected type {}.".format(column_name, sortinghat_type)
             )
 
     return attributes_arff, sortinghat_types
