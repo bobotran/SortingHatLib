@@ -27,8 +27,8 @@ setup(
     long_description_content_type="text/markdown",
     packages=['sortinghatinf'],
     package_data={"": ["resources/*"]},
-    install_requires=['pandas','numpy', 'nltk', 'joblib', 'scikit-learn==0.22.2.post1'],
+    install_requires=['pandas','numpy<1.24', 'nltk', 'joblib', 'scikit-learn==1.2.2'],
     python_requires=">=3.6",
-    version='0.0.6',
+    version='0.0.7',
     license='MIT',
 )

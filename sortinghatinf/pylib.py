@@ -273,7 +273,9 @@ def load_RF(df):
     """
     Runs the Random Forest Classifier on the given data.
     """
-    y_RF = Pickled_LR_Model.predict(df).tolist()
+    # Avoid sklearn error from mixed column name types
+    arr = df.to_numpy()
+    y_RF = Pickled_LR_Model.predict(arr).tolist()
     return y_RF
 
 ### Public Functions ###
